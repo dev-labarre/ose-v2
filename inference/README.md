@@ -38,3 +38,7 @@ results = predict_batch(siren_list, df_features)
 ## Low-Evidence Shrinkage
 
 If `article_count < 5`, probabilities are shrunk toward the base rate (0.1) to account for low evidence.
+
+## Financial & Signal Scores
+
+Training now injects notebook-derived financial growth/profit scores and Decidento-weighted signal scores into the feature list before selection. These columns are bundled automatically into `feature_list.json` and the trained artifacts; no inference-time changes are required beyond keeping features up to date.

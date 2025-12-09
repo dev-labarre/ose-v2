@@ -62,8 +62,8 @@ def run_evaluation():
     print("\n✓ Evaluation completed")
 
 
-def run_ablation_study(X_train=None, X_test=None, y_train=None, y_test=None, 
-                       selected_features=None, random_state=42):
+def run_ablation_study(X_train=None, X_test=None, y_train=None, y_test=None,
+                       selected_features=None, random_state=42, suffix: str = ""):
     """
     Run ablation study: text-only, tabular-only, full.
     
@@ -95,7 +95,7 @@ def run_ablation_study(X_train=None, X_test=None, y_train=None, y_test=None,
                 'tabular_only': {'roc_auc': 0.0, 'pr_auc': 0.0, 'error': 'Data files not found'},
                 'full': {'roc_auc': 0.0, 'pr_auc': 0.0, 'error': 'Data files not found'}
             }
-            ablation_path = reports_dir / 'text_ablation.json'
+            ablation_path = reports_dir / f'text_ablation{suffix}.json'
             with open(ablation_path, 'w', encoding='utf-8') as f:
                 json.dump(ablation_results, f, indent=2)
             return
@@ -265,7 +265,7 @@ def run_ablation_study(X_train=None, X_test=None, y_train=None, y_test=None,
         ablation_results['full'] = {'roc_auc': 0.0, 'pr_auc': 0.0, 'error': 'No features'}
     
     # Save results
-    ablation_path = reports_dir / 'text_ablation.json'
+    ablation_path = reports_dir / f'text_ablation{suffix}.json'
     with open(ablation_path, 'w', encoding='utf-8') as f:
         json.dump(ablation_results, f, indent=2, default=str)
     

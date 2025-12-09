@@ -138,8 +138,9 @@ def process_text_features(df_features: pd.DataFrame, df_articles: pd.DataFrame,
     print("\n📝 Building combined_titles from pre-t0 articles...")
     
     if 'publishedAt' in df_articles.columns:
-        df_articles['publishedAt_parsed'] = pd.to_datetime(
-            df_articles['publishedAt'], errors='coerce'
+        df_articles['publishedAt_parsed'] = (
+            pd.to_datetime(df_articles['publishedAt'], errors='coerce', utc=True)
+            .dt.tz_localize(None)
         )
         df_articles_pre_t0 = df_articles[df_articles['publishedAt_parsed'] < T0].copy()
     else:

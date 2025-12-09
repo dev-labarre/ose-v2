@@ -151,7 +151,7 @@ class DataQualityTransformer(BaseEstimator, TransformerMixin):
                 
                 # Apply median imputation to preserved critical features
                 for col in preserved_critical_features:
-                    if col in X_cleaned.columns and X_cleaned[col].dtype in [np.number, 'int64', 'float64']:
+                    if col in X_cleaned.columns and pd.api.types.is_numeric_dtype(X_cleaned[col]):
                         median_val = X_cleaned[col].median()
                         if pd.notna(median_val):
                             X_cleaned[col] = X_cleaned[col].fillna(median_val)

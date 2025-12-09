@@ -3,7 +3,7 @@ Main training script.
 Orchestrates the complete pipeline:
 1. Temporal windowing
 2. Data quality
-3. External ratios
+3. Financial & signal scoring
 4. Text processing
 5. Feature selection
 6. Model training & calibration
@@ -23,6 +23,7 @@ import hashlib
 from pathlib import Path
 from datetime import datetime
 import joblib
+import argparse
 
 # Set seeds
 RANDOM_SEED = 42
@@ -33,11 +34,11 @@ random.seed(RANDOM_SEED)
 # Import modules
 from src.data.windowing import build_temporal_windows
 from src.data.quality import DataQualityTransformer, generate_missing_summary, generate_kept_features_report
-from src.external.fetch_inpi_ratios import fetch_all_ratios
-from src.features.financials import process_inpi_ratios
+from src.features.financials import aggregate_financial_and_signal_scores
 from src.features.text import process_text_features
 from src.features.selection import select_features
 from src.pipeline.builder import build_pipeline, apply_low_evidence_shrinkage
+from src.models.configs import PRESETS, BASELINE
 from sklearn.model_selection import GroupShuffleSplit
 import json as json_module
 
@@ -63,7 +64,7 @@ def compute_data_hash(df: pd.DataFrame) -> str:
     return hashlib.md5(data_str.encode()).hexdigest()[:16]
 
 
-def save_run_manifest(paths: dict, validation: dict, selection_report: dict):
+def save_run_manifest(paths: dict, validation: dict, selection_report: dict, config_name: str):
     """Save run manifest with version, seed, data hash, etc."""
     manifest = {
         'version': 'current',
@@ -90,7 +91,8 @@ def save_run_manifest(paths: dict, validation: dict, selection_report: dict):
         'model': {
             'type': 'XGBoost + CalibratedClassifierCV',
             'calibration': 'isotonic (cv=3)',
-            'random_state': RANDOM_SEED
+            'random_state': RANDOM_SEED,
+            'config': config_name
         },
         'validation': validation,
         'feature_selection': selection_report
@@ -103,6 +105,17 @@ def save_run_manifest(paths: dict, validation: dict, selection_report: dict):
     print(f"\n✓ Run manifest saved to {manifest_path}")
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="Train ose-v3 model with optional experiment config.")
+    parser.add_argument(
+        "--config",
+        default="baseline",
+        choices=list(PRESETS.keys()),
+        help="Model preset to use (baseline, col_tilt_mild, fin_pen_mild, depth_soft)"
+    )
+    return parser.parse_args()
+
+
 def main():
     """Main training pipeline."""
     print("="*80)
@@ -110,6 +123,11 @@ def main():
     print("="*80)
     
     paths = get_project_paths()
+    args = parse_args()
+    config_name = args.config
+    config = PRESETS.get(config_name, BASELINE)
+    model_params = config.get('model_params', {})
+    suffix = "" if config_name == "baseline" else f"_{config_name}"
     
     # Ensure directories exist
     for dir_path in paths.values():
@@ -168,18 +186,14 @@ def main():
             paths['reports'] / 'kept_features.json'
         )
         
-        # Step 3: External ratios (if available)
+        # Step 3: Financial + signal scoring (from coworker notebook logic)
         print("\n" + "="*80)
-        print("STEP 3: EXTERNAL INPI RATIOS")
+        print("STEP 3: FINANCIAL & SIGNAL SCORING")
         print("="*80)
-        ratios_path = paths['data_external'] / 'inpi_ratios.parquet'
-        if ratios_path.exists():
-            df_features_cleaned = process_inpi_ratios(
-                df_features_cleaned, ratios_path,
-                paths['reports'] / 'ratio_summary.json'
-            )
-        else:
-            print("  ⚠️  Ratios file not found. Run 'make fetch_ratios' first.")
+        df_features_cleaned = aggregate_financial_and_signal_scores(
+            df_features_cleaned,
+            paths['reports'] / 'financial_signal_summary.json'
+        )
         
         # Step 4: Text processing
         print("\n" + "="*80)
@@ -192,7 +206,7 @@ def main():
             df_articles = pd.DataFrame(articles_data)
             df_features_cleaned = process_text_features(
                 df_features_cleaned, df_articles,
-                paths['reports'] / 'text_ablation.json'
+                paths['reports'] / f'text_ablation{suffix}.json'
             )
         else:
             print("  ⚠️  Articles file not found")
@@ -234,7 +248,8 @@ def main():
             numeric_features=numeric_features,
             categorical_features=categorical_features,
             text_features=text_features,
-            random_state=RANDOM_SEED
+            random_state=RANDOM_SEED,
+            model_params=model_params
         )
         
         # Temporal split
@@ -281,8 +296,8 @@ def main():
         print("  ✓ Training completed")
         
         # Save models
-        raw_model_path = paths['models'] / 'final_raw.joblib'
-        calibrated_model_path = paths['models'] / 'final_calibrated.joblib'
+        raw_model_path = paths['models'] / f'final_raw{suffix}.joblib'
+        calibrated_model_path = paths['models'] / f'final_calibrated{suffix}.joblib'
         
         # Extract raw XGBoost (before calibration)
         # CalibratedClassifierCV stores base estimators in calibrated_classifiers_
@@ -315,12 +330,12 @@ def main():
         
         # Save preprocessor for inference
         preprocessor = pipeline.named_steps['preprocessor']
-        inference_preprocessor_path = paths['inference'] / 'preprocess.joblib'
+        inference_preprocessor_path = paths['inference'] / f'preprocess{suffix}.joblib'
         joblib.dump(preprocessor, inference_preprocessor_path)
         print(f"  ✓ Saved preprocessor to {inference_preprocessor_path}")
         
         # Save feature list
-        feature_list_path = paths['inference'] / 'feature_list.json'
+        feature_list_path = paths['inference'] / f'feature_list{suffix}.json'
         with open(feature_list_path, 'w', encoding='utf-8') as f:
             json.dump({'features': selected_features}, f, indent=2)
         print(f"  ✓ Saved feature list to {feature_list_path}")
@@ -340,9 +355,9 @@ def main():
         
         metrics = {
             'accuracy': float(accuracy_score(y_test, y_pred)),
-            'precision': float(precision_score(y_test, y_pred)),
-            'recall': float(recall_score(y_test, y_pred)),
-            'f1_score': float(f1_score(y_test, y_pred)),
+            'precision': float(precision_score(y_test, y_pred, zero_division=0)),
+            'recall': float(recall_score(y_test, y_pred, zero_division=0)),
+            'f1_score': float(f1_score(y_test, y_pred, zero_division=0)),
             'roc_auc': float(roc_auc_score(y_test, y_pred_proba)),
             'pr_auc': float(average_precision_score(y_test, y_pred_proba)),
             'brier_score': float(brier_score_loss(y_test, y_pred_proba))
@@ -353,7 +368,7 @@ def main():
             print(f"    {metric}: {value:.4f}")
         
         # Save metrics
-        metrics_path = paths['reports'] / 'metrics.json'
+        metrics_path = paths['reports'] / f'metrics{suffix}.json'
         with open(metrics_path, 'w', encoding='utf-8') as f:
             json.dump(metrics, f, indent=2)
         print(f"\n  ✓ Metrics saved to {metrics_path}")
@@ -370,7 +385,8 @@ def main():
                 y_train=y_train,
                 y_test=y_test,
                 selected_features=selected_features,
-                random_state=RANDOM_SEED
+                random_state=RANDOM_SEED,
+                suffix=suffix
             )
             print("\n  ✓ Ablation study completed")
         except Exception as e:
@@ -379,7 +395,7 @@ def main():
             traceback.print_exc()
         
         # Save run manifest
-        save_run_manifest(paths, validation, selection_report)
+        save_run_manifest(paths, validation, selection_report, config_name)
         
         print("\n" + "="*80)
         print("✅ TRAINING PIPELINE COMPLETED SUCCESSFULLY!")

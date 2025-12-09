@@ -38,7 +38,8 @@ def build_pipeline(feature_names: List[str],
                   numeric_features: List[str],
                   categorical_features: List[str],
                   text_features: List[str] = None,
-                  random_state: int = 42) -> Pipeline:
+                  random_state: int = 42,
+                  model_params: dict = None) -> Pipeline:
     """
     Build pipeline: ColumnTransformer → FeatureMask → XGBoost → Calibration.
     
@@ -85,8 +86,8 @@ def build_pipeline(feature_names: List[str],
     # Feature mask (select final features)
     feature_mask = FeatureMask(feature_names=feature_names)
     
-    # XGBoost
-    xgb = XGBClassifier(
+    # XGBoost (allow overriding default hyperparameters for experiments)
+    default_params = dict(
         tree_method="hist",
         eval_metric="logloss",
         random_state=random_state,
@@ -95,6 +96,9 @@ def build_pipeline(feature_names: List[str],
         learning_rate=0.1,
         verbosity=0
     )
+    if model_params:
+        default_params.update(model_params)
+    xgb = XGBClassifier(**default_params)
     
     # Calibration
     calibrated = CalibratedClassifierCV(

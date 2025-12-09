@@ -1,4 +1,4 @@
-.PHONY: setup install clean extract fetch_ratios features train explain eval classifications ablate report test all help
+.PHONY: setup install clean extract features train explain eval classifications ablate report test all help
 
 # Default Python version
 PYTHON_VERSION := 3.10.6
@@ -11,7 +11,6 @@ help:
 	@echo "  make install       - Install dependencies"
 	@echo "  make clean         - Remove generated files (models, reports, data artifacts)"
 	@echo "  make extract       - Extract data from source files to data/raw_json/"
-	@echo "  make fetch_ratios  - Cache external INPI ratios to data/external/inpi_ratios.parquet"
 	@echo "  make features      - Build temporal windows (features < t0, labels [t0→t1])"
 	@echo "  make train         - Fit and calibrate model"
 	@echo "  make explain       - Generate SHAP artifacts"
@@ -68,24 +67,13 @@ clean:
 extract:
 	@echo "📥 Extracting data from source files..."
 	@if command -v pyenv > /dev/null 2>&1 && pyenv versions | grep -q $(VENV_NAME); then \
-		eval "$$(pyenv init -)" && pyenv activate $(VENV_NAME) && python -m src.extract_all; \
+		eval "$$(pyenv init -)" && pyenv activate $(VENV_NAME) && python -m src.extraction.run_all_extractions; \
 	elif [ -d "$(VENV_NAME)" ]; then \
-		$(VENV_NAME)/bin/python -m src.extract_all; \
+		$(VENV_NAME)/bin/python -m src.extraction.run_all_extractions; \
 	else \
-		python3 -m src.extract_all; \
+		python3 -m src.extraction.run_all_extractions; \
 	fi
 	@echo "✅ Extraction completed"
-
-fetch_ratios:
-	@echo "📊 Fetching external INPI ratios..."
-	@if command -v pyenv > /dev/null 2>&1 && pyenv versions | grep -q $(VENV_NAME); then \
-		eval "$$(pyenv init -)" && pyenv activate $(VENV_NAME) && python -m src.external.fetch_inpi_ratios; \
-	elif [ -d "$(VENV_NAME)" ]; then \
-		$(VENV_NAME)/bin/python -m src.external.fetch_inpi_ratios; \
-	else \
-		python3 -m src.external.fetch_inpi_ratios; \
-	fi
-	@echo "✅ Ratio fetching completed"
 
 features:
 	@echo "🔧 Engineering features..."

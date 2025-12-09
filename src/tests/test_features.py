@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 
 from src.features import text as text_mod
-from src.features.financials import process_inpi_ratios
+from src.features.financials import aggregate_financial_and_signal_scores
 from src.features import selection
 
 
@@ -44,25 +44,6 @@ def test_process_text_features_adds_pca_columns(monkeypatch, tmp_path):
     assert output_path.exists()
 
 
-def test_process_inpi_ratios_merges_and_flags(tmp_path):
-    fixture_root = Path(__file__).resolve().parent / "fixtures"
-    ratios_path = fixture_root / "data_external" / "inpi_ratios.parquet"
-    output_path = tmp_path / "ratio_summary.json"
-
-    df_features = pd.DataFrame({"siren": ["100", "200"]})
-    merged = process_inpi_ratios(df_features, ratios_path, output_path)
-
-    added_cols = [c for c in merged.columns if c.startswith("ca_") or c.startswith("resultat_net_")]
-    assert added_cols, "Ratio features should be added"
-    # Flags are only created if there are missing values in the ratio features
-    # Check that either flags exist (if missing values) or no flags (if no missing values)
-    has_flags = any(c.endswith("_was_nan") for c in merged.columns)
-    has_missing = merged[added_cols].isna().any().any()
-    # If there are missing values, flags should exist; if no missing values, flags may not exist
-    assert not has_missing or has_flags, "If ratio features have missing values, _was_nan flags should be created"
-    assert output_path.exists()
-
-
 def test_select_features_uses_deterministic_feature_list(monkeypatch, tmp_path):
     # Stub model-based selection to avoid xgboost cost and ensure determinism
     monkeypatch.setattr(selection, "model_based_selection", lambda X, y, text_features, **kwargs: ["num_a", "text_pca_0"])
@@ -88,3 +69,38 @@ def test_select_features_uses_deterministic_feature_list(monkeypatch, tmp_path):
     assert list(df_selected.columns) == selected
     assert report["selected_features"] == 2
     assert policy_path.exists() and selection_path.exists()
+
+
+def test_aggregate_financial_and_signal_scores(tmp_path):
+    signals = [
+        {"type": {"code": "B"}, "publishedAt": "2022-01-01T00:00:00Z"},
+        {"type": {"code": "O"}, "publishedAt": "2022-06-01T00:00:00Z"},
+    ]
+    df_features = pd.DataFrame(
+        {
+            "siren": ["111", "111"],
+            "year": [2020, 2022],
+            "ca_final": [100.0, 120.0],
+            "resultat_final": [10.0, 20.0],
+            "effectif": [10.0, 11.0],
+            "capital_social": [50.0, 50.0],
+            "signals": [signals, signals],
+            "nbEtabSecondaire": [1, 1],
+            "dateCreationUniteLegale": ["2010-01-01", "2010-01-01"],
+        }
+    )
+
+    report_path = tmp_path / "financial_signal_summary.json"
+    enriched = aggregate_financial_and_signal_scores(df_features, report_path)
+
+    expected_cols = {
+        "financial_score_last",
+        "growth_score_last",
+        "profit_score_last",
+        "signal_score",
+        "decidento_score",
+        "OSE_score",
+    }
+    assert expected_cols.issubset(enriched.columns)
+    assert enriched.loc[0, "financial_score_last"] != 0
+    assert report_path.exists()

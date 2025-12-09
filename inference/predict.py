@@ -4,6 +4,7 @@ Handles single SIREN and batch predictions without rounding.
 """
 
 import sys
+import os
 import pandas as pd
 import numpy as np
 from pathlib import Path
@@ -17,13 +18,22 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.append(str(PROJECT_ROOT))
 
 
-def load_inference_artifacts():
+def resolve_suffix(explicit_suffix: Optional[str] = None) -> str:
+    """Resolve model suffix from explicit argument or environment variable."""
+    if explicit_suffix is not None:
+        return explicit_suffix
+    env_suffix = os.getenv("OSE_MODEL_SUFFIX", "")
+    return env_suffix
+
+
+def load_inference_artifacts(suffix: Optional[str] = None):
     """Load all inference artifacts."""
     project_root = Path(__file__).resolve().parents[1]
+    resolved_suffix = resolve_suffix(suffix)
     
-    preprocessor_path = project_root / 'inference' / 'preprocess.joblib'
-    model_path = project_root / 'models' / 'final_calibrated.joblib'
-    feature_list_path = project_root / 'inference' / 'feature_list.json'
+    preprocessor_path = project_root / 'inference' / f'preprocess{resolved_suffix}.joblib'
+    model_path = project_root / 'models' / f'final_calibrated{resolved_suffix}.joblib'
+    feature_list_path = project_root / 'inference' / f'feature_list{resolved_suffix}.json'
     
     preprocessor = joblib.load(preprocessor_path)
     model = joblib.load(model_path)

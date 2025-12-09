@@ -122,7 +122,7 @@ def merge_on_siren(data_dict: Dict[str, List[Dict]], preserve_panel: bool = True
         if "siren" in signals_df.columns:
             signals_df["siren"] = signals_df["siren"].astype(str)
             signals_grouped = signals_df.groupby("siren").apply(
-                lambda x: x.to_dict("records")
+                lambda x: x.to_dict("records"), include_groups=False
             ).to_dict()
             df["signals"] = df["siren"].map(signals_grouped).fillna("").apply(
                 lambda x: x if isinstance(x, list) else []
@@ -135,7 +135,7 @@ def merge_on_siren(data_dict: Dict[str, List[Dict]], preserve_panel: bool = True
         if "siren" in articles_df.columns:
             articles_df["siren"] = articles_df["siren"].astype(str)
             articles_grouped = articles_df.groupby("siren").apply(
-                lambda x: x.to_dict("records")
+                lambda x: x.to_dict("records"), include_groups=False
             ).to_dict()
             df["articles"] = df["siren"].map(articles_grouped).fillna("").apply(
                 lambda x: x if isinstance(x, list) else []

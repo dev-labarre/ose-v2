@@ -56,6 +56,12 @@ def test_generate_classifications_smoke(tmp_path, monkeypatch):
     
     # Now import generate_classifications (will use patched function)
     from src.reporting import generate_classifications
+    # Force generate_classifications to treat the temp project as project_root
+    monkeypatch.setattr(
+        generate_classifications,
+        "__file__",
+        str(project_root / "src" / "reporting" / "generate_classifications.py"),
+    )
 
     output_path = generate_classifications.extract_all_classifications(output_dir=project_root / "reports")
     assert output_path.exists()

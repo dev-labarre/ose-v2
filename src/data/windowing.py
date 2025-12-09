@@ -126,71 +126,102 @@ def build_temporal_windows():
     df_articles = pd.DataFrame(articles_data)
     
     if len(df_articles) == 0:
-        raise ValueError("No articles data found")
-    
-    # Parse publishedAt dates
-    df_articles['publishedAt_parsed'] = df_articles['publishedAt'].apply(
-        lambda x: parse_date(x)
-    )
-    
-    # Filter articles in label window [t0 → t1]
-    label_articles = df_articles[
-        (df_articles['publishedAt_parsed'] >= T0) & 
-        (df_articles['publishedAt_parsed'] < T1)
-    ].copy()
-    
-    print(f"  ✓ Found {len(label_articles)} articles in label window [{T0} → {T1}]")
-    
-    # Extract signal labels
-    label_articles['signal_labels'] = label_articles['signalsType'].apply(extract_signal_labels)
-    
-    # Aggregate by company
-    label_articles_agg = label_articles.groupby(['siren']).agg({
-        'title': lambda x: ' '.join(x.fillna('').astype(str)),
-        'signal_labels': lambda x: [label for labels in x for label in labels],
-    }).reset_index()
-    
-    label_articles_agg.columns = ['siren', 'combined_titles_label', 'all_signals_label']
-    
-    # Count articles
-    article_counts = label_articles.groupby('siren').size().reset_index(name='article_count_label')
-    label_articles_agg = label_articles_agg.merge(article_counts, on='siren', how='left')
-    
-    # Count positive/negative signals
-    label_articles_agg['positive_count'] = label_articles_agg['all_signals_label'].apply(
-        lambda x: count_signals(x, POSITIVE_SIGNALS)
-    )
-    label_articles_agg['negative_count'] = label_articles_agg['all_signals_label'].apply(
-        lambda x: count_signals(x, NEGATIVE_SIGNALS)
-    )
-    
-    # Create target variable
-    label_articles_agg['is_good_opportunity'] = (
-        (label_articles_agg['positive_count'] > label_articles_agg['negative_count']) |
-        (label_articles_agg['positive_count'] >= 2)
-    ).astype(int)
+        print("  ⚠️  No articles data found; creating empty labels dataset")
+        # Create empty labels DataFrame with required columns and proper dtypes
+        label_articles_agg = pd.DataFrame({
+            'siren': pd.Series(dtype='str'),
+            'combined_titles_label': pd.Series(dtype='str'),
+            'all_signals_label': pd.Series(dtype='object'),
+            'article_count_label': pd.Series(dtype='int64'),
+            'positive_count': pd.Series(dtype='int64'),
+            'negative_count': pd.Series(dtype='int64'),
+            'is_good_opportunity': pd.Series(dtype='int64')
+        })
+    else:
+        # Parse publishedAt dates
+        df_articles['publishedAt_parsed'] = (
+            pd.to_datetime(df_articles['publishedAt'], errors='coerce', utc=True)
+            .dt.tz_localize(None)
+        )
+        
+        # Filter articles in label window [t0 → t1]
+        label_articles = df_articles[
+            (df_articles['publishedAt_parsed'] >= T0) & 
+            (df_articles['publishedAt_parsed'] < T1)
+        ].copy()
+        
+        print(f"  ✓ Found {len(label_articles)} articles in label window [{T0} → {T1}]")
+        
+        if len(label_articles) == 0:
+            # No articles in the label window, create empty labels
+            label_articles_agg = pd.DataFrame({
+                'siren': pd.Series(dtype='str'),
+                'combined_titles_label': pd.Series(dtype='str'),
+                'all_signals_label': pd.Series(dtype='object'),
+                'article_count_label': pd.Series(dtype='int64'),
+                'positive_count': pd.Series(dtype='int64'),
+                'negative_count': pd.Series(dtype='int64'),
+                'is_good_opportunity': pd.Series(dtype='int64')
+            })
+        else:
+            # Extract signal labels
+            label_articles['signal_labels'] = label_articles['signalsType'].apply(extract_signal_labels)
+            
+            # Aggregate by company
+            label_articles_agg = label_articles.groupby(['siren']).agg({
+                'title': lambda x: ' '.join(x.fillna('').astype(str)),
+                'signal_labels': lambda x: [label for labels in x for label in labels],
+            }).reset_index()
+            
+            label_articles_agg.columns = ['siren', 'combined_titles_label', 'all_signals_label']
+            
+            # Count articles
+            article_counts = label_articles.groupby('siren').size().reset_index(name='article_count_label')
+            label_articles_agg = label_articles_agg.merge(article_counts, on='siren', how='left')
+            
+            # Count positive/negative signals
+            label_articles_agg['positive_count'] = label_articles_agg['all_signals_label'].apply(
+                lambda x: count_signals(x, POSITIVE_SIGNALS)
+            )
+            label_articles_agg['negative_count'] = label_articles_agg['all_signals_label'].apply(
+                lambda x: count_signals(x, NEGATIVE_SIGNALS)
+            )
+            
+            # Create target variable
+            label_articles_agg['is_good_opportunity'] = (
+                (label_articles_agg['positive_count'] > label_articles_agg['negative_count']) |
+                (label_articles_agg['positive_count'] >= 2)
+            ).astype(int)
     
     # Save labels
     labels_path = labels_dir / 'labels.parquet'
     label_articles_agg.to_parquet(labels_path, index=False)
     print(f"  ✓ Saved labels to {labels_path}")
     print(f"    Companies with labels: {len(label_articles_agg)}")
-    print(f"    Good opportunities: {label_articles_agg['is_good_opportunity'].sum()}")
+    if len(label_articles_agg) > 0:
+        print(f"    Good opportunities: {label_articles_agg['is_good_opportunity'].sum()}")
+    else:
+        print(f"    Good opportunities: 0")
     
     # Process features (all data < t0)
     print("\n📊 Building features from < t0 window...")
     
     # Filter articles for features (pre-t0 only)
-    feature_articles = df_articles[df_articles['publishedAt_parsed'] < T0].copy()
-    print(f"  ✓ Found {len(feature_articles)} articles for features (< {T0})")
+    if len(df_articles) > 0 and 'publishedAt_parsed' in df_articles.columns:
+        feature_articles = df_articles[df_articles['publishedAt_parsed'] < T0].copy()
+        print(f"  ✓ Found {len(feature_articles)} articles for features (< {T0})")
+    else:
+        feature_articles = pd.DataFrame()
+        print(f"  ⚠️  No articles data available for features")
     
     # Process signals for features (pre-t0 only)
     signals_data = data_dict.get('signals', [])
     df_signals = pd.DataFrame(signals_data)
     
     if len(df_signals) > 0:
-        df_signals['publishedAt_parsed'] = df_signals['publishedAt'].apply(
-            lambda x: parse_date(x)
+        df_signals['publishedAt_parsed'] = (
+            pd.to_datetime(df_signals['publishedAt'], errors='coerce', utc=True)
+            .dt.tz_localize(None)
         )
         feature_signals = df_signals[df_signals['publishedAt_parsed'] < T0].copy()
         print(f"  ✓ Found {len(feature_signals)} signals for features (< {T0})")
@@ -219,7 +250,7 @@ def build_temporal_windows():
     # Replace articles and signals with pre-t0 filtered versions
     if len(feature_articles) > 0:
         feature_articles_grouped = feature_articles.groupby('siren').apply(
-            lambda x: x.to_dict('records')
+            lambda x: x.to_dict('records'), include_groups=False
         ).to_dict()
         merged_features['articles'] = merged_features['siren'].map(feature_articles_grouped).fillna("").apply(
             lambda x: x if isinstance(x, list) else []
@@ -227,11 +258,61 @@ def build_temporal_windows():
     
     if len(feature_signals) > 0:
         feature_signals_grouped = feature_signals.groupby('siren').apply(
-            lambda x: x.to_dict('records')
+            lambda x: x.to_dict('records'), include_groups=False
         ).to_dict()
         merged_features['signals'] = merged_features['siren'].map(feature_signals_grouped).fillna("").apply(
             lambda x: x if isinstance(x, list) else []
         )
+    
+    # Convert numeric columns to proper types before saving to parquet
+    print("  🔧 Converting numeric columns to proper types...")
+    numeric_columns = [
+        'capital_social', 'caConsolide', 'caGroupe', 'resultatExploitation',
+        'ca_bilan', 'resultat_exploitation', 'resultat_bilan', 'fonds_propres',
+        'effectif', 'ca_france', 'ca_consolide', 'resultat_net_consolide',
+        'salaires_traitements', 'charges_financieres', 'impots_taxes',
+        'dotations_amortissements', 'ca_export', 'evolution_ca', 'evolution_effectif',
+        'subventions_investissements', 'participation_bilan', 'filiales_participations',
+        'year', 'annee', 'duree_exercice', 'effectif_sous_traitance',
+        'effectifConsolide', 'effectifEstime', 'effectifGroupe', 'effectif_workforce',
+        'nbEtabSecondaire', 'nbEtabActifs', 'nbEtabSecondairesActifs'
+    ]
+    
+    # Also check for kpi_* columns that might be numeric
+    kpi_numeric_columns = [col for col in merged_features.columns 
+                           if col.startswith('kpi_')]
+    numeric_columns.extend(kpi_numeric_columns)
+    
+    # Convert object columns that contain numeric strings
+    for col in numeric_columns:
+        if col in merged_features.columns:
+            if merged_features[col].dtype == 'object':
+                # Convert to numeric, coercing errors to NaN
+                merged_features[col] = pd.to_numeric(merged_features[col], errors='coerce')
+    
+    # Also try to convert any remaining object columns that look numeric
+    # (columns that are mostly numeric strings)
+    excluded_cols = {'siren', 'siret', 'company_name', 'departement', 'resume_activite', 
+                     'raison_sociale', 'raison_sociale_keyword', 'articles', 'signals',
+                     'last_modified', 'dateConsolide', 'date_cloture_exercice', 
+                     'dateCreationUniteLegale', 'processedAt', 'updatedAt', 'createdAt',
+                     'publishedAt', 'title', 'author', 'signalsStatus', 'signalsType',
+                     'country', 'sectors', 'cities', 'sources', 'continent', 'type'}
+    
+    for col in merged_features.columns:
+        if col not in excluded_cols and merged_features[col].dtype == 'object':
+            # Check if column contains mostly numeric values
+            sample = merged_features[col].dropna()
+            if len(sample) > 0:
+                # Try to convert a sample
+                try:
+                    numeric_sample = pd.to_numeric(sample.head(100), errors='coerce')
+                    numeric_ratio = numeric_sample.notna().sum() / len(numeric_sample)
+                    # If >80% of values can be converted to numeric, convert the whole column
+                    if numeric_ratio > 0.8:
+                        merged_features[col] = pd.to_numeric(merged_features[col], errors='coerce')
+                except:
+                    pass
     
     # Save features
     features_path = features_dir / 'features.parquet'
@@ -261,22 +342,43 @@ def build_temporal_windows():
         validation['validation_checks']['feature_signals_before_t0'] = max_signal_date < T0 if pd.notna(max_signal_date) else None
     
     # Check label dates
-    if len(label_articles) > 0:
-        min_label_date = label_articles['publishedAt_parsed'].min()
-        max_label_date = label_articles['publishedAt_parsed'].max()
-        validation['validation_checks']['min_label_date'] = str(min_label_date)
-        validation['validation_checks']['max_label_date'] = str(max_label_date)
-        validation['validation_checks']['labels_in_window'] = (
-            (min_label_date >= T0 if pd.notna(min_label_date) else None) and
-            (max_label_date < T1 if pd.notna(max_label_date) else None)
-        )
+    if len(df_articles) > 0 and 'publishedAt_parsed' in df_articles.columns:
+        label_articles = df_articles[
+            (df_articles['publishedAt_parsed'] >= T0) & 
+            (df_articles['publishedAt_parsed'] < T1)
+        ].copy()
+        if len(label_articles) > 0:
+            min_label_date = label_articles['publishedAt_parsed'].min()
+            max_label_date = label_articles['publishedAt_parsed'].max()
+            validation['validation_checks']['min_label_date'] = str(min_label_date)
+            validation['validation_checks']['max_label_date'] = str(max_label_date)
+            validation['validation_checks']['labels_in_window'] = (
+                (min_label_date >= T0 if pd.notna(min_label_date) else None) and
+                (max_label_date < T1 if pd.notna(max_label_date) else None)
+            )
+        else:
+            validation['validation_checks']['min_label_date'] = None
+            validation['validation_checks']['max_label_date'] = None
+            validation['validation_checks']['labels_in_window'] = None
+    else:
+        validation['validation_checks']['min_label_date'] = None
+        validation['validation_checks']['max_label_date'] = None
+        validation['validation_checks']['labels_in_window'] = None
     
     # Sample counts
+    label_articles_count = 0
+    if len(df_articles) > 0 and 'publishedAt_parsed' in df_articles.columns:
+        label_articles_filtered = df_articles[
+            (df_articles['publishedAt_parsed'] >= T0) & 
+            (df_articles['publishedAt_parsed'] < T1)
+        ]
+        label_articles_count = len(label_articles_filtered)
+    
     validation['sample_counts'] = {
         'feature_companies': len(merged_features),
         'label_companies': len(label_articles_agg),
         'feature_articles': len(feature_articles),
-        'label_articles': len(label_articles),
+        'label_articles': label_articles_count,
         'feature_signals': len(feature_signals) if len(feature_signals) > 0 else 0
     }
     
