@@ -2,10 +2,12 @@ import shutil
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 from src.data import windowing
 
 
+@pytest.mark.smoke
 def test_build_temporal_windows_respects_cutoffs(tmp_path, monkeypatch):
     """
     Ensure build_temporal_windows outputs features/labels in correct windows and
