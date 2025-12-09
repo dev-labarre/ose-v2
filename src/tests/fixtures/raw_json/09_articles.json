@@ -1,0 +1,42 @@
+[
+  {
+    "siren": "100",
+    "publishedAt": "2022-07-01",
+    "title": "Alpha raises seed",
+    "signalsType": [
+      {
+        "label": "Investissements"
+      }
+    ]
+  },
+  {
+    "siren": "200",
+    "publishedAt": "2022-08-01",
+    "title": "Beta restructures",
+    "signalsType": [
+      {
+        "label": "Restructuration, R\u00e9organisation"
+      }
+    ]
+  },
+  {
+    "siren": "100",
+    "publishedAt": "2023-03-10",
+    "title": "Alpha hires engineers",
+    "signalsType": [
+      {
+        "label": "Recrutement"
+      }
+    ]
+  },
+  {
+    "siren": "200",
+    "publishedAt": "2023-04-05",
+    "title": "Beta layoffs continue",
+    "signalsType": [
+      {
+        "label": "Licenciement & ch\u00f4mage"
+      }
+    ]
+  }
+]

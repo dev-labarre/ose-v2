@@ -1,0 +1,12 @@
+[
+  {
+    "siren": "100",
+    "company_name": "Alpha SAS",
+    "siret": "10000000000000"
+  },
+  {
+    "siren": "200",
+    "company_name": "Beta SARL",
+    "siret": "20000000000000"
+  }
+]
