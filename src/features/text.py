@@ -21,7 +21,7 @@ except ImportError:
 from sklearn.decomposition import PCA
 from sklearn.feature_extraction.text import TfidfVectorizer
 
-T0 = pd.Timestamp('2023-01-01', tz='UTC')
+T0 = pd.Timestamp('2023-01-01')
 
 
 def build_combined_titles(df_articles: pd.DataFrame, siren: str) -> str:
@@ -191,11 +191,13 @@ def process_text_features(df_features: pd.DataFrame, df_articles: pd.DataFrame,
     pca = PCA(n_components=10, random_state=42)
     pca_embeddings = pca.fit_transform(embeddings_array)
     
-    print(f"  ✓ PCA applied: {embeddings_array.shape[1]} → 10 components")
+    # Get actual number of components (in case stub has fewer)
+    n_components = pca_embeddings.shape[1]
+    print(f"  ✓ PCA applied: {embeddings_array.shape[1]} → {n_components} components")
     print(f"  Explained variance: {pca.explained_variance_ratio_.sum():.3f}")
     
     # Add PCA components as features
-    for i in range(10):
+    for i in range(n_components):
         df_features[f'text_pca_{i}'] = pca_embeddings[:, i]
     
     print(f"  ✓ Added 10 PCA text features")

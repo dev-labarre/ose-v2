@@ -19,7 +19,7 @@ def test_build_temporal_windows_respects_cutoffs(tmp_path, monkeypatch):
     raw_json_dir.mkdir(parents=True, exist_ok=True)
 
     # Copy fixture raw JSON inputs
-    fixture_root = Path(__file__).resolve().parents[1] / "fixtures" / "raw_json"
+    fixture_root = Path(__file__).resolve().parent / "fixtures" / "raw_json"
     for fname in ["01_company_basic_info.json", "02_financial_data.json", "07_kpi_data.json", "08_signals.json", "09_articles.json"]:
         shutil.copy(fixture_root / fname, raw_json_dir / fname)
 
@@ -32,9 +32,12 @@ def test_build_temporal_windows_respects_cutoffs(tmp_path, monkeypatch):
     features, labels, validation = windowing.build_temporal_windows()
 
     # Features use only pre-t0 articles/signals
-    assert all(ts < windowing.T0 for ts in pd.to_datetime(
-        [art["publishedAt"] for arts in features["articles"] for art in arts]
-    ))
+    article_dates_raw = [art["publishedAt"] for arts in features["articles"] for art in arts]
+    article_dates = pd.to_datetime(article_dates_raw, errors='coerce')
+    # Ensure timezone-naive for comparison (T0 is now timezone-naive)
+    if article_dates.dt.tz is not None:
+        article_dates = article_dates.dt.tz_localize(None)
+    assert all(ts < windowing.T0 for ts in article_dates if pd.notna(ts))
 
     # Labels only from [t0, t1)
     assert validation["validation_checks"]["min_label_date"].startswith(str(windowing.T0.date()))

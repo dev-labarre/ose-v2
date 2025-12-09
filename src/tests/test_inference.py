@@ -35,7 +35,7 @@ def test_predict_single_and_batch_use_stubbed_model(monkeypatch):
         def predict_proba(self, X):
             return np.tile([[0.2, 0.8]], (len(X), 1))
 
-    df_features = pd.DataFrame({"siren": ["1", "2"], "feature_a": [1.0, 2.0]})
+    df_features = pd.DataFrame({"siren": ["1", "2"], "feature_a": [1.0, 2.0], "article_count": [10, 10]})
 
     monkeypatch.setattr(
         predict,

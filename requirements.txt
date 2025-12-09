@@ -31,3 +31,6 @@ requests>=2.28.0,<3.0.0
 # Jupyter notebook (optional)
 jupyter>=1.0.0,<2.0.0
 ipykernel>=6.0.0,<7.0.0
+
+# Testing
+pytest>=7.0.0,<8.0.0

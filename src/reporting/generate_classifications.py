@@ -145,12 +145,15 @@ def extract_all_classifications(
     for optional_field in contextual_fields:
         if optional_field in results_df.columns:
             aggregation[optional_field] = "mean"
+    
+    # Only include metadata columns in aggregation if they exist
+    agg_dict = aggregation.copy()
+    if "company_name" in results_df.columns:
+        agg_dict["company_name"] = "first"
+    if "siret" in results_df.columns:
+        agg_dict["siret"] = "first"
 
-    results_df = results_df.groupby("siren").agg({
-        **aggregation,
-        "company_name": "first",
-        "siret": "first"
-    }).reset_index()
+    results_df = results_df.groupby("siren").agg(agg_dict).reset_index()
     results_df["predicted_opportunity"] = results_df["predicted_opportunity"].astype(int)
 
     # Reorder columns for readability
@@ -167,7 +170,7 @@ def extract_all_classifications(
     results_df = results_df.sort_values("opportunity_score", ascending=False)
 
     # Save ALL companies to JSON
-    output_path = reports_dir / "all_company_classifications.json"
+    output_path = reports_dir / "all_company_ranking.json"
     results_df.to_json(output_path, orient="records", indent=2, force_ascii=False)
     
     print(f"✓ Saved {len(results_df)} company classifications to {output_path}")

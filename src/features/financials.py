@@ -10,7 +10,7 @@ from typing import Dict
 import json
 from datetime import datetime
 
-T0 = pd.Timestamp('2023-01-01')
+T0 = pd.Timestamp('2023-01-01')  # timezone-naive
 
 
 def winsorize(series: pd.Series, lower: float = 0.01, upper: float = 0.99) -> pd.Series:

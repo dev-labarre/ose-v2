@@ -65,7 +65,12 @@ def predict_single(siren: str, df_features: pd.DataFrame) -> Dict:
     score = proba[1]  # Positive class probability
     
     # Apply low-evidence shrinkage if needed
-    article_count = company_data.get('article_count', pd.Series([0])).iloc[0] if 'article_count' in company_data.columns else 0
+    if 'article_count' in company_data.columns:
+        article_count = company_data['article_count'].iloc[0]
+        if pd.isna(article_count):
+            article_count = 0
+    else:
+        article_count = 0
     if article_count < 5:
         base_rate = 0.1  # Default base rate
         shrinkage_factor = article_count / 5
@@ -185,6 +190,12 @@ def predict_all_and_rank(
             on="siren",
             how="left"
         )
+    else:
+        # Ensure columns exist even if merge didn't happen
+        if "company_name" not in results_df.columns:
+            results_df["company_name"] = None
+        if "siret" not in results_df.columns:
+            results_df["siret"] = None
 
     # Add a couple of contextual numeric fields if available
     contextual_fields = ["effectif", "effectifConsolide", "nbFilialesDirectes"]
@@ -204,12 +215,15 @@ def predict_all_and_rank(
     for optional_field in contextual_fields:
         if optional_field in results_df.columns:
             aggregation[optional_field] = "mean"
+    
+    # Only include metadata columns in aggregation if they exist
+    agg_dict = aggregation.copy()
+    if "company_name" in results_df.columns:
+        agg_dict["company_name"] = "first"
+    if "siret" in results_df.columns:
+        agg_dict["siret"] = "first"
 
-    results_df = results_df.groupby("siren").agg({
-        **aggregation,
-        "company_name": "first",
-        "siret": "first"
-    }).reset_index()
+    results_df = results_df.groupby("siren").agg(agg_dict).reset_index()
     results_df["predicted_opportunity"] = results_df["predicted_opportunity"].astype(int)
 
     # Reorder columns for readability

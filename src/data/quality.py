@@ -127,7 +127,8 @@ class DataQualityTransformer(BaseEstimator, TransformerMixin):
                 
                 if pct_missing > (self.missing_threshold * 100) and not is_critical:
                     cols_to_drop.append(col)
-                elif is_critical and pct_missing > (self.missing_threshold * 100):
+                elif is_critical:
+                    # Preserve ALL critical features regardless of missing rate
                     preserved_critical_features.append(col)
             
             if cols_to_drop:
@@ -140,8 +141,15 @@ class DataQualityTransformer(BaseEstimator, TransformerMixin):
                 self.quality_stats_['columns_dropped_high_missing'] = 0
                 self.dropped_columns_ = []
             
-            # Apply median imputation to preserved critical features
+            # Add _was_nan flags for preserved critical features BEFORE imputation
             if preserved_critical_features:
+                for col in preserved_critical_features:
+                    if col in X_cleaned.columns and X_cleaned[col].isna().any():
+                        flag_col = f"{col}_was_nan"
+                        X_cleaned[flag_col] = X_cleaned[col].isna().astype(int)
+                        self.missing_flag_columns_.append(flag_col)
+                
+                # Apply median imputation to preserved critical features
                 for col in preserved_critical_features:
                     if col in X_cleaned.columns and X_cleaned[col].dtype in [np.number, 'int64', 'float64']:
                         median_val = X_cleaned[col].median()
@@ -153,13 +161,14 @@ class DataQualityTransformer(BaseEstimator, TransformerMixin):
                 self.quality_stats_['critical_features_preserved'] = preserved_critical_features
                 print(f"  ✓ Preserved {len(preserved_critical_features)} critical numeric features with median imputation: {preserved_critical_features[:3]}{'...' if len(preserved_critical_features) > 3 else ''}")
         
-        # Add _was_nan flags for all columns with missing values
-        self.missing_flag_columns_ = []
+        # Add _was_nan flags for all other columns with missing values
         for col in X_cleaned.columns:
-            if X_cleaned[col].isna().any():
-                flag_col = f"{col}_was_nan"
-                X_cleaned[flag_col] = X_cleaned[col].isna().astype(int)
-                self.missing_flag_columns_.append(flag_col)
+            if col not in [f"{pc}_was_nan" for pc in preserved_critical_features] and col not in preserved_critical_features:
+                if X_cleaned[col].isna().any():
+                    flag_col = f"{col}_was_nan"
+                    X_cleaned[flag_col] = X_cleaned[col].isna().astype(int)
+                    if flag_col not in self.missing_flag_columns_:
+                        self.missing_flag_columns_.append(flag_col)
         
         self.transformed_shape_ = X_cleaned.shape
         self.quality_stats_['missing_flags_created'] = len(self.missing_flag_columns_)

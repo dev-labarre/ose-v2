@@ -112,7 +112,9 @@ def test_train_smoke_writes_artifacts(tmp_path, monkeypatch):
 
     monkeypatch.setattr(train_mod, "build_pipeline", lambda **kwargs: _DummyPipeline())
     monkeypatch.setattr(train_mod, "joblib", type("J", (), {"dump": lambda *args, **kwargs: Path(args[1]).write_text("stub")}))  # type: ignore[arg-type]
-    monkeypatch.setattr(train_mod, "run_ablation_study", lambda **kwargs: {})
+    # run_ablation_study is imported from evaluator, not in train module
+    from src.models import evaluator as evaluator_mod
+    monkeypatch.setattr(evaluator_mod, "run_ablation_study", lambda **kwargs: {})
 
     # Run main
     train_mod.main()

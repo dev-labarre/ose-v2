@@ -1,4 +1,4 @@
-.PHONY: setup install clean extract fetch_ratios features train explain eval classifications ablate report all help
+.PHONY: setup install clean extract fetch_ratios features train explain eval classifications ablate report test all help
 
 # Default Python version
 PYTHON_VERSION := 3.10.6
@@ -19,6 +19,7 @@ help:
 	@echo "  make classifications - Generate all company classifications JSON"
 	@echo "  make ablate        - Run text-only, tabular-only, full ablations"
 	@echo "  make report        - Generate PDF report"
+	@echo "  make test          - Run pytest test suite"
 	@echo "  make all           - Full pipeline (clean → extract → features → train → explain → eval → classifications → ablate → report)"
 
 setup:
@@ -162,6 +163,17 @@ report:
 		python3 -c "from src.reporting.generate_report import generate_full_report; generate_full_report()"; \
 	fi
 	@echo "✅ Report generation completed"
+
+test:
+	@echo "🧪 Running test suite..."
+	@if command -v pyenv > /dev/null 2>&1 && pyenv versions | grep -q $(VENV_NAME); then \
+		eval "$$(pyenv init -)" && pyenv activate $(VENV_NAME) && python -m pytest src/tests -v; \
+	elif [ -d "$(VENV_NAME)" ]; then \
+		$(VENV_NAME)/bin/python -m pytest src/tests -v; \
+	else \
+		python3 -m pytest src/tests -v; \
+	fi
+	@echo "✅ Test suite completed"
 
 all: clean extract features train explain eval classifications ablate report
 	@echo "✅ Full pipeline completed!"

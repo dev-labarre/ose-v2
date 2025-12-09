@@ -1,11 +1,10 @@
 from pathlib import Path
 import json
+import sys
 
 import numpy as np
 import pandas as pd
 import pytest
-
-from src.reporting import generate_classifications, generate_report
 
 
 @pytest.mark.smoke
@@ -35,14 +34,30 @@ def test_generate_classifications_smoke(tmp_path, monkeypatch):
         def predict(self, X):
             return np.array([1, 0])
 
-    monkeypatch.setattr(generate_classifications.predict, "__file__", str(project_root / "inference" / "predict.py"))
-    monkeypatch.setattr(
-        generate_classifications.predict,
-        "load_inference_artifacts",
-        lambda: ("prep", _ModelStub(), ["feature_a"]),
-    )
+    # Patch inference.predict module BEFORE importing generate_classifications
+    # Remove from cache first
+    import importlib
+    modules_to_remove = [
+        'src.reporting.generate_classifications',
+        'inference.predict'
+    ]
+    for mod_name in modules_to_remove:
+        if mod_name in sys.modules:
+            del sys.modules[mod_name]
+    
+    # Now import and patch
+    import inference.predict as predict_mod
+    monkeypatch.setattr(predict_mod, "__file__", str(project_root / "inference" / "predict.py"))
+    
+    def mock_load_artifacts():
+        return ("prep", _ModelStub(), ["feature_a"])
+    
+    monkeypatch.setattr(predict_mod, "load_inference_artifacts", mock_load_artifacts)
+    
+    # Now import generate_classifications (will use patched function)
+    from src.reporting import generate_classifications
 
-    output_path = generate_classifications.extract_all_classifications(output_dir=project_root / "reports", top_n=1)
+    output_path = generate_classifications.extract_all_classifications(output_dir=project_root / "reports")
     assert output_path.exists()
     data = json.loads(Path(output_path).read_text())
     assert len(data) == 2
@@ -50,6 +65,7 @@ def test_generate_classifications_smoke(tmp_path, monkeypatch):
 
 
 def test_generate_report_placeholder_runs(tmp_path, monkeypatch):
+    from src.reporting import generate_report
     monkeypatch.setattr(generate_report, "__file__", str(tmp_path / "src" / "reporting" / "generate_report.py"))
     # Should run without raising even when reports dir does not yet exist
     generate_report.generate_full_report()

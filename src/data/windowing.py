@@ -13,9 +13,9 @@ import ast
 
 from src.data.loader import load_all_json_data, merge_on_siren
 
-# Temporal windows (timezone-aware UTC to match parsed dates)
-T0 = pd.Timestamp('2023-01-01', tz='UTC')
-T1 = pd.Timestamp('2024-01-01', tz='UTC')
+# Temporal windows (timezone-naive to match parsed dates)
+T0 = pd.Timestamp('2023-01-01')
+T1 = pd.Timestamp('2024-01-01')
 
 
 def parse_date(date_str, default=None):
@@ -27,7 +27,7 @@ def parse_date(date_str, default=None):
             return date_str
         if isinstance(date_str, datetime):
             return pd.Timestamp(date_str)
-        return pd.to_datetime(date_str, errors='coerce', utc=True)
+        return pd.to_datetime(date_str, errors='coerce')
     except:
         return default
 
