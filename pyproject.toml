@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ose-v2"
+version = "0.1.0"
+description = "OSE v2 pipeline package (installed in editable mode for API reuse)"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+  {name = "OSE Team"},
+]
+dependencies = []
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
