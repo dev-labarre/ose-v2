@@ -3,7 +3,7 @@ Main training script.
 Orchestrates the complete pipeline:
 1. Temporal windowing
 2. Data quality
-3. Financial & signal scoring
+3. External ratios
 4. Text processing
 5. Feature selection
 6. Model training & calibration
@@ -34,7 +34,8 @@ random.seed(RANDOM_SEED)
 # Import modules
 from src.data.windowing import build_temporal_windows
 from src.data.quality import DataQualityTransformer, generate_missing_summary, generate_kept_features_report
-from src.features.financials import aggregate_financial_and_signal_scores
+from src.external.fetch_inpi_ratios import fetch_all_ratios
+from src.features.financials import process_inpi_ratios, aggregate_financial_and_signal_scores
 from src.features.text import process_text_features
 from src.features.selection import select_features
 from src.pipeline.builder import build_pipeline, apply_low_evidence_shrinkage
@@ -186,9 +187,22 @@ def main():
             paths['reports'] / 'kept_features.json'
         )
         
-        # Step 3: Financial + signal scoring (from coworker notebook logic)
+        # Step 3: External ratios (if available)
         print("\n" + "="*80)
-        print("STEP 3: FINANCIAL & SIGNAL SCORING")
+        print("STEP 3: EXTERNAL INPI RATIOS")
+        print("="*80)
+        ratios_path = paths['data_external'] / 'inpi_ratios.parquet'
+        if ratios_path.exists():
+            df_features_cleaned = process_inpi_ratios(
+                df_features_cleaned, ratios_path,
+                paths['reports'] / 'ratio_summary.json'
+            )
+        else:
+            print("  ⚠️  Ratios file not found. Run 'make fetch_ratios' first.")
+
+        # Step 3b: Financial + signal scoring (from coworker notebook logic)
+        print("\n" + "="*80)
+        print("STEP 3b: FINANCIAL & SIGNAL SCORING")
         print("="*80)
         df_features_cleaned = aggregate_financial_and_signal_scores(
             df_features_cleaned,

@@ -181,6 +181,41 @@ def generate_shap_explanations():
         print(f"  ✓ Saved 10 local explanations to {examples_dir}")
     else:
         print("  ⚠️  Matplotlib not available, skipping local explanation plots")
+    
+    # SHAP Force plots (PNG visualizations)
+    if MATPLOTLIB_AVAILABLE:
+        print("  Generating SHAP force plots...")
+        force_plots_dir = reports_dir / 'shap_force_plots'
+        force_plots_dir.mkdir(parents=True, exist_ok=True)
+        
+        for i in range(min(10, len(X_test))):
+            try:
+                # Ensure we have the right shape for SHAP values
+                if len(shap_values.shape) == 2:
+                    values = shap_values[i]
+                else:
+                    values = shap_values
+                
+                # Generate force plot as PNG using matplotlib
+                shap.force_plot(
+                    explainer.expected_value,
+                    values,
+                    X_test_transformed[i],
+                    feature_names=transformed_feature_names,
+                    matplotlib=True,
+                    show=False
+                )
+                plt.savefig(force_plots_dir / f'force_plot_{i+1}.png', dpi=150, bbox_inches='tight')
+                plt.close()
+                
+            except Exception as e:
+                print(f"  ⚠️  Could not generate force plot {i+1}: {e}")
+                plt.close()
+        
+        print(f"  ✓ Saved 10 force plots to {force_plots_dir}")
+    else:
+        print("  ⚠️  Matplotlib not available, skipping force plots")
+    
     print("\n✓ SHAP explanations completed")
 
 

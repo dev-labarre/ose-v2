@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 
 from src.features import text as text_mod
-from src.features.financials import aggregate_financial_and_signal_scores
+from src.features.financials import process_inpi_ratios, aggregate_financial_and_signal_scores
 from src.features import selection
 
 
@@ -41,6 +41,25 @@ def test_process_text_features_adds_pca_columns(monkeypatch, tmp_path):
     # PCA features present from stub
     assert {"text_pca_0", "text_pca_1"}.issubset(result.columns)
     # Report written
+    assert output_path.exists()
+
+
+def test_process_inpi_ratios_merges_and_flags(tmp_path):
+    fixture_root = Path(__file__).resolve().parent / "fixtures"
+    ratios_path = fixture_root / "data_external" / "inpi_ratios.parquet"
+    output_path = tmp_path / "ratio_summary.json"
+
+    df_features = pd.DataFrame({"siren": ["100", "200"]})
+    merged = process_inpi_ratios(df_features, ratios_path, output_path)
+
+    added_cols = [c for c in merged.columns if c.startswith("ca_") or c.startswith("resultat_net_")]
+    assert added_cols, "Ratio features should be added"
+    # Flags are only created if there are missing values in the ratio features
+    # Check that either flags exist (if missing values) or no flags (if no missing values)
+    has_flags = any(c.endswith("_was_nan") for c in merged.columns)
+    has_missing = merged[added_cols].isna().any().any()
+    # If there are missing values, flags should exist; if no missing values, flags may not exist
+    assert not has_missing or has_flags, "If ratio features have missing values, _was_nan flags should be created"
     assert output_path.exists()
 
 

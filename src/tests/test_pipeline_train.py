@@ -1,6 +1,6 @@
 import json
-import sys
 from pathlib import Path
+from argparse import Namespace
 
 import numpy as np
 import pandas as pd
@@ -72,6 +72,7 @@ def test_train_smoke_writes_artifacts(tmp_path, monkeypatch):
             return X
 
     monkeypatch.setattr(train_mod, "DataQualityTransformer", _DQT)
+    monkeypatch.setattr(train_mod, "process_inpi_ratios", lambda df, ratios_path, output_path: df)
     monkeypatch.setattr(train_mod, "process_text_features", lambda df, articles, output_path: df)
     monkeypatch.setattr(
         train_mod,
@@ -116,8 +117,8 @@ def test_train_smoke_writes_artifacts(tmp_path, monkeypatch):
     from src.models import evaluator as evaluator_mod
     monkeypatch.setattr(evaluator_mod, "run_ablation_study", lambda **kwargs: {})
 
-    # Mock sys.argv to avoid argparse errors with pytest arguments
-    monkeypatch.setattr(sys, "argv", ["train.py"])
+    # Mock parse_args to avoid argparse parsing pytest arguments
+    monkeypatch.setattr(train_mod, "parse_args", lambda: Namespace(config="baseline"))
 
     # Run main
     train_mod.main()
