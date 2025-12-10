@@ -23,6 +23,12 @@ env/
 /data/
 /reports/
 /documents/
+# Large binary artifacts
+*.parquet
+*.joblib
+*.pkl
+*.h5
+temp/
 
 # Build/packaging
 build/
