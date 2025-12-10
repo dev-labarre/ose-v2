@@ -121,9 +121,15 @@ class SourceFormatRequest(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "companies": [{"siren": "123456789", "socialName": "ABC Corp", ...}],
-                "articles": [{"title": "...", "publishedAt": "2022-06-01", ...}],
-                "projects": [{"type": "...", "publishedAt": "2022-06-01", ...}]
+                "companies": [
+                    {"siren": "123456789", "socialName": "ABC Corp"}
+                ],
+                "articles": [
+                    {"title": "Sample headline", "publishedAt": "2022-06-01"}
+                ],
+                "projects": [
+                    {"type": "tender", "publishedAt": "2022-06-01"}
+                ]
             }
         }
     )

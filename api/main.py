@@ -80,7 +80,7 @@ app = FastAPI(
         "email": "support@ose.example.com",
     },
     license_info={
-        "name": "Proprietary",
+        "name": "Anne-Délia de Roquemaurel , Hugo Arrufat , Jérémy Labarre",
     },
     lifespan=lifespan,
 )
@@ -173,7 +173,6 @@ async def predict(request: PredictionRequest):
     Returns:
     - **score**: Opportunity score (0.0 to 1.0)
     - **article_count**: Number of articles available for the company
-    - **confidence**: "high" if article_count >= 5, "low" otherwise
     """
     service = get_service()
     
